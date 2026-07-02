@@ -6,15 +6,28 @@ import "./RWATokenFactory.sol";
 interface IWETH {
     function deposit() external payable;
     function withdraw(uint256) external;
+    function approve(address spender, uint256 amount) external returns (bool);
 }
 
 interface IRWATokenFactory {
     function buyToken(address tokenAddress, uint256 collateralAmount) external;
 }
 
+interface IZapperPoolManager {
+    function unlock(bytes calldata data) external returns (bytes memory);
+    function swap(
+        PoolKey memory key,
+        SwapParams memory params,
+        bytes memory hookData
+    ) external returns (int256 delta);
+    function settle() external payable returns (uint256);
+    function take(address currency, address to, uint256 amount) external;
+}
+
 contract BorkZapper {
-    address public constant POOL_MANAGER = 0x8366a39CC670B4001A1121B8F6A443A643e40951;
+    address public constant POOL_MANAGER = address(uint160(0x008366a39CC670B4001A1121B8F6A443a643e40951));
     address public constant WETH = 0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73;
+    address public constant USDG = 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168;
     
     uint160 internal constant MIN_SQRT_RATIO = 4295128739;
     uint160 internal constant MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970342;
@@ -29,11 +42,12 @@ contract BorkZapper {
 
     // Struct to pass callback data
     struct UnlockData {
-        PoolKey poolKey;
-        uint256 wethAmount;
         address collateralToken;
-        address memeToken;
+        uint24 poolFee;
+        int24 tickSpacing;
+        uint256 ethAmount;
         address recipient;
+        address memeToken;
     }
 
     // Swaps ETH to Collateral and buys the Meme Token in one transaction
@@ -45,38 +59,36 @@ contract BorkZapper {
     ) external payable {
         require(msg.value > 0, "No ETH sent");
 
-        // 1. Wrap native ETH to WETH
-        IWETH(WETH).deposit{value: msg.value}();
+        uint256 collateralReceived;
 
-        // 2. Set up PoolKey for Uniswap V4 swap
-        bool wethIsToken0 = WETH < collateralToken;
-        PoolKey memory poolKey = PoolKey({
-            currency0: wethIsToken0 ? WETH : collateralToken,
-            currency1: wethIsToken0 ? collateralToken : WETH,
-            fee: poolFee,
-            tickSpacing: tickSpacing,
-            hooks: address(0)
-        });
+        if (collateralToken == WETH) {
+            // Case 1: Collateral is WETH itself. Wrap ETH -> WETH and buy directly.
+            IWETH(WETH).deposit{value: msg.value}();
+            collateralReceived = msg.value;
+            IERC20(WETH).approve(factory, collateralReceived);
+            IRWATokenFactory(factory).buyToken(memeToken, collateralReceived);
+        } else {
+            // Case 2: Multi-hop swap ETH -> USDG -> collateralToken
+            bytes memory unlockData = abi.encode(
+                UnlockData({
+                    collateralToken: collateralToken,
+                    poolFee: poolFee,
+                    tickSpacing: tickSpacing,
+                    ethAmount: msg.value,
+                    recipient: msg.sender,
+                    memeToken: memeToken
+                })
+            );
 
-        // 3. Call PoolManager.unlock to execute the swap
-        bytes memory unlockData = abi.encode(
-            UnlockData({
-                poolKey: poolKey,
-                wethAmount: msg.value,
-                collateralToken: collateralToken,
-                memeToken: memeToken,
-                recipient: msg.sender
-            })
-        );
+            bytes memory result = IZapperPoolManager(POOL_MANAGER).unlock(unlockData);
+            collateralReceived = abi.decode(result, (uint256));
 
-        bytes memory result = IPoolManager(POOL_MANAGER).unlock(unlockData);
-        uint256 collateralReceived = abi.decode(result, (uint256));
+            // Approve collateral to Factory and call buyToken
+            IERC20(collateralToken).approve(factory, collateralReceived);
+            IRWATokenFactory(factory).buyToken(memeToken, collateralReceived);
+        }
 
-        // 4. Approve collateral to Factory and call buyToken
-        IERC20(collateralToken).approve(factory, collateralReceived);
-        IRWATokenFactory(factory).buyToken(memeToken, collateralReceived);
-
-        // 5. Transfer purchased meme tokens back to the user
+        // Transfer purchased meme tokens back to the user
         uint256 memeBalance = IERC20(memeToken).balanceOf(address(this));
         require(IERC20(memeToken).transfer(msg.sender, memeBalance), "Meme transfer failed");
     }
@@ -86,30 +98,82 @@ contract BorkZapper {
         require(msg.sender == POOL_MANAGER, "Only PoolManager");
 
         UnlockData memory uData = abi.decode(data, (UnlockData));
-        bool wethIsToken0 = WETH < uData.collateralToken;
+        uint256 collateralReceived;
 
-        // Execute Swap on PoolManager
-        BalanceDelta memory delta = IPoolManager(POOL_MANAGER).swap(
-            uData.poolKey,
-            SwapParams({
-                zeroForOne: wethIsToken0,
-                amountSpecified: -int256(uData.wethAmount),
-                sqrtPriceLimitX96: wethIsToken0 ? MIN_SQRT_RATIO + 1 : MAX_SQRT_RATIO - 1
-            }),
-            ""
-        );
+        if (uData.collateralToken == USDG) {
+            // 1-hop swap: ETH -> USDG (fee 500, tickSpacing 10)
+            PoolKey memory ethUsdgKey = PoolKey({
+                currency0: address(0), // ETH is address(0)
+                currency1: USDG,
+                fee: 500,
+                tickSpacing: 10,
+                hooks: address(0)
+            });
 
-        int256 wethDelta = wethIsToken0 ? delta.amount0 : delta.amount1;
-        int256 collateralDelta = wethIsToken0 ? delta.amount1 : delta.amount0;
+            int256 delta = IZapperPoolManager(POOL_MANAGER).swap(
+                ethUsdgKey,
+                SwapParams({
+                    zeroForOne: true, // ETH is currency0
+                    amountSpecified: -int256(uData.ethAmount),
+                    sqrtPriceLimitX96: MIN_SQRT_RATIO + 1
+                }),
+                ""
+            );
 
-        // Settle WETH (transfer WETH to PoolManager and notify settlement)
-        uint256 wethOwed = uint256(wethDelta);
-        IERC20(WETH).transfer(POOL_MANAGER, wethOwed);
-        IPoolManager(POOL_MANAGER).settle(WETH);
+            // Extract amount1 (USDG received, positive)
+            collateralReceived = uint256(uint128(int128(delta)));
+        } else {
+            // 2-hop swap: ETH -> USDG (fee 500, tickSpacing 10) then USDG -> collateralToken
+            PoolKey memory ethUsdgKey = PoolKey({
+                currency0: address(0),
+                currency1: USDG,
+                fee: 500,
+                tickSpacing: 10,
+                hooks: address(0)
+            });
+
+            int256 delta1 = IZapperPoolManager(POOL_MANAGER).swap(
+                ethUsdgKey,
+                SwapParams({
+                    zeroForOne: true,
+                    amountSpecified: -int256(uData.ethAmount),
+                    sqrtPriceLimitX96: MIN_SQRT_RATIO + 1
+                }),
+                ""
+            );
+
+            // Extract amount1 (USDG received, positive)
+            uint256 usdgAmount = uint256(uint128(int128(delta1)));
+
+            bool usdgIsToken0 = USDG < uData.collateralToken;
+            PoolKey memory usdgColKey = PoolKey({
+                currency0: usdgIsToken0 ? USDG : uData.collateralToken,
+                currency1: usdgIsToken0 ? uData.collateralToken : USDG,
+                fee: uData.poolFee,
+                tickSpacing: uData.tickSpacing,
+                hooks: address(0)
+            });
+
+            int256 delta2 = IZapperPoolManager(POOL_MANAGER).swap(
+                usdgColKey,
+                SwapParams({
+                    zeroForOne: usdgIsToken0,
+                    amountSpecified: -int256(usdgAmount),
+                    sqrtPriceLimitX96: usdgIsToken0 ? MIN_SQRT_RATIO + 1 : MAX_SQRT_RATIO - 1
+                }),
+                ""
+            );
+
+            // Extract received collateral (positive)
+            int256 colDelta = usdgIsToken0 ? int256(int128(delta2)) : int256(int128(delta2 >> 128));
+            collateralReceived = uint256(colDelta);
+        }
+
+        // Settle native ETH debt using the payable settle() function
+        IZapperPoolManager(POOL_MANAGER).settle{value: uData.ethAmount}();
 
         // Take Collateral (withdraw the swapped collateral token to this contract)
-        uint256 collateralReceived = uint256(-collateralDelta);
-        IPoolManager(POOL_MANAGER).take(uData.collateralToken, address(this), collateralReceived);
+        IZapperPoolManager(POOL_MANAGER).take(uData.collateralToken, address(this), collateralReceived);
 
         return abi.encode(collateralReceived);
     }

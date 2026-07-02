@@ -10,8 +10,8 @@ export const robinhoodChain = defineChain({
 });
 
 export const TARGET_RAISE_USD = 13800; // 20% of 69k
-export const FACTORY_ADDRESS = "0xa3aCd620399cdaB00da2c5F1c0D196e0CB955dD7";
-export const ZAPPER_ADDRESS = "0x8107b108bB6deb88a76632FA5d7372013e047eE6";
+export const FACTORY_ADDRESS = "0x77d8615dFDce74A2Cf2d1eC1044B2F5bDfc3115B";
+export const ZAPPER_ADDRESS = "0xa9c659E78Ff2d71A7a96D96Aaa826CC0A149Ff00";
 
 export const FACTORY_ABI = [
   "function launchToken(string name, string symbol, address collateralToken, uint256 targetCollateral, string tokenURI) external returns (address)",

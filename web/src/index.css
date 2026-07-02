@@ -75,17 +75,27 @@ body {
 .logo {
   display: flex;
   align-items: center;
-  gap: var(--spacing-12);
+  gap: var(--spacing-8);
+  color: var(--color-obsidian) !important;
+  text-decoration: none;
+}
+
+.logo:visited, .logo:hover, .logo:active {
+  color: var(--color-obsidian) !important;
 }
 
 .logo-glyph {
-  font-size: 14px;
+  color: var(--color-obsidian) !important;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 
 .logo-text {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: var(--tracking-tight);
+  color: var(--color-obsidian) !important;
 }
 
 .network-badge {
@@ -773,11 +783,22 @@ body {
   border-radius: var(--radius-small-elements);
 }
 
-/* Proper Select and Input rows */
 .form-row.split-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--spacing-16);
+}
+
+.form-row.split-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--spacing-16);
+}
+
+@media (max-width: 768px) {
+  .form-row.split-2, .form-row.split-3 {
+    grid-template-columns: 1fr;
+  }
 }
 
 .selector-pills {
@@ -1188,6 +1209,32 @@ textarea:focus {
   border-radius: 4px;
   margin-top: 6px;
   font-family: var(--font-geist-mono);
+}
+
+.compact-social-link {
+  font-size: 13px;
+  text-decoration: none;
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.compact-social-link:hover {
+  transform: scale(1.2);
+  opacity: 0.8;
+}
+
+.badge.social {
+  background-color: var(--color-obsidian);
+  color: var(--color-paper);
+  border: 1px solid var(--color-obsidian);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.badge.social:hover {
+  opacity: 0.8;
+  transform: translateY(-1px);
 }
 
 .compact-stats-row {

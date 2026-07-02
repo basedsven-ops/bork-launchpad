@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useActiveAccount } from 'thirdweb/react';
+import { useActiveAccount, useSwitchActiveWalletChain } from 'thirdweb/react';
 import { ethers6Adapter } from 'thirdweb/adapters/ethers6';
 import { ethers } from 'ethers';
 import { Link } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { client, robinhoodChain, FACTORY_ADDRESS, RWATokenFactoryABI, ERC20ABI, 
 
 export default function Home() {
   const account = useActiveAccount();
+  const switchChain = useSwitchActiveWalletChain();
   const [tokens, setTokens] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentCategory, setCurrentCategory] = useState("ALL");
@@ -32,6 +33,7 @@ export default function Home() {
         const provider = new ethers.JsonRpcProvider("https://rpc.mainnet.chain.robinhood.com");
         const factory = new ethers.Contract(FACTORY_ADDRESS, RWATokenFactoryABI, provider);
         const allTokenAddrs = await factory.getAllTokens();
+        console.log("[BORK] getAllTokens returned:", allTokenAddrs);
         
         const tokenPromises = allTokenAddrs.map(async (addr) => {
           try {
@@ -46,6 +48,9 @@ export default function Home() {
             
             let tDesc = "";
             let tImg = "";
+            let tWebsite = "";
+            let tTwitter = "";
+            let tTelegram = "";
             
             // Metadata fetch can fail without breaking the token listing
             try {
@@ -55,19 +60,27 @@ export default function Home() {
                 const metaJson = await metaRes.json();
                 tDesc = metaJson.description || "";
                 tImg = metaJson.image ? metaJson.image.replace("ipfs://", `https://${client.clientId}.ipfscdn.io/ipfs/`) : "";
+                tWebsite = metaJson.website || "";
+                tTwitter = metaJson.twitter || "";
+                tTelegram = metaJson.telegram || "";
               }
             } catch (e) {
-              console.error("Failed to fetch IPFS metadata", e);
+              console.error("[BORK] Failed to fetch IPFS metadata for", addr, e);
             }
 
             const collateralAsset = RWA_WHITELIST.find(a => a.address.toLowerCase() === info.collateralToken.toLowerCase()) || {};
 
             // Calculate Dynamic Market Cap
-            const vMeme = parseFloat(ethers.formatUnits(info.virtualMemeReserve, 18));
-            const vCol = parseFloat(ethers.formatUnits(info.virtualCollateralReserve, 18));
-            const ratio = vMeme > 0 ? (vCol / vMeme) : 0;
-            const totalSupply = parseFloat(ethers.formatUnits(info.totalMemeSupply, 18));
-            const mcapUSD = (totalSupply * ratio * (collateralAsset.price || 1)).toLocaleString(undefined, { maximumFractionDigits: 0 });
+            let mcapUSD = "0";
+            try {
+              const vMeme = parseFloat(ethers.formatUnits(info.virtualMemeReserve, 18));
+              const vCol = parseFloat(ethers.formatUnits(info.virtualCollateralReserve, 18));
+              const ratio = vMeme > 0 ? (vCol / vMeme) : 0;
+              const totalSupply = parseFloat(ethers.formatUnits(info.totalMemeSupply, 18));
+              mcapUSD = (totalSupply * ratio * (collateralAsset.price || 1)).toLocaleString(undefined, { maximumFractionDigits: 0 });
+            } catch (e) {
+              console.error("[BORK] Failed to calculate mcap for", addr, e);
+            }
 
             return {
               id: addr,
@@ -82,24 +95,30 @@ export default function Home() {
               category: collateralAsset.category || "Equities",
               creator: info.creator.substring(0, 6) + "..." + info.creator.substring(38),
               description: tDesc,
-              image: tImg
+              image: tImg,
+              website: tWebsite,
+              twitter: tTwitter,
+              telegram: tTelegram
             };
           } catch (tokenErr) {
-            console.error("Error fetching token", addr, tokenErr);
+            console.error("[BORK] Error fetching token", addr, tokenErr);
             return null;
           }
         });
         
         const fetchedTokens = (await Promise.all(tokenPromises)).filter(t => t !== null);
+        console.log("[BORK] Fetched tokens:", fetchedTokens.length);
         fetchedTokens.reverse(); // Keep latest first
         
         setTokens(fetchedTokens);
       } catch (err) {
-        console.error("Error fetching on-chain tokens:", err);
+        console.error("[BORK] Error fetching on-chain tokens:", err);
       }
     }
     
     fetchTokens();
+    const interval = setInterval(fetchTokens, 15000); // refresh every 15s
+    return () => clearInterval(interval);
   }, []);
   
   // Launch Form State
@@ -111,6 +130,10 @@ export default function Home() {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [twitterUrl, setTwitterUrl] = useState("");
+  const [telegramUrl, setTelegramUrl] = useState("");
+  const [devBuyEth, setDevBuyEth] = useState("");
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -126,8 +149,13 @@ export default function Home() {
     if (!account) return alert("Please connect wallet first");
 
     setIsSubmitting(true);
-    setStatusMsg("Uploading to IPFS...");
+    setStatusMsg("Switching to Robinhood Chain in Wallet...");
+
     try {
+      // Prompt wallet to switch network to Robinhood L2
+      await switchChain(robinhoodChain);
+
+      setStatusMsg("Uploading logo to IPFS...");
       const imgFormData = new FormData();
       imgFormData.append("file", logoFile);
       const imgRes = await fetch("https://storage.thirdweb.com/ipfs/upload", {
@@ -146,7 +174,10 @@ export default function Home() {
         name: tokenName,
         symbol: tokenSymbol.toUpperCase(),
         description,
-        image: `ipfs://${imageIpfsHash}`
+        image: `ipfs://${imageIpfsHash}`,
+        website: websiteUrl.trim(),
+        twitter: twitterUrl.trim(),
+        telegram: telegramUrl.trim()
       };
 
       const metaFormData = new FormData();
@@ -179,13 +210,27 @@ export default function Home() {
         tokenURI
       );
 
-      setStatusMsg("Waiting for tx confirmation...");
-      await tx.wait();
+      setStatusMsg("Waiting for launch tx confirmation...");
+      const receipt = await tx.wait();
+
+      // Find tokenAddress from event logs
+      let tokenAddress = "";
+      for (const log of receipt.logs) {
+        try {
+          const parsedLog = factoryContract.interface.parseLog(log);
+          if (parsedLog && parsedLog.name === "TokenLaunched") {
+            tokenAddress = parsedLog.args.tokenAddress;
+            break;
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
 
       setStatusMsg("Token successfully launched!");
       
       setTokens(prev => [{
-        id: `user_${Date.now()}`,
+        id: tokenAddress || `user_${Date.now()}`,
         name: tokenName,
         symbol: tokenSymbol.toUpperCase(),
         collateralSymbol: collateralToken,
@@ -197,13 +242,25 @@ export default function Home() {
         category: asset.category,
         creator: account.address.substring(0, 6) + "..." + account.address.substring(38),
         description: description,
-        image: `https://${client.clientId}.ipfscdn.io/ipfs/${imageIpfsHash}`
+        image: `https://${client.clientId}.ipfscdn.io/ipfs/${imageIpfsHash}`,
+        website: websiteUrl.trim(),
+        twitter: twitterUrl.trim(),
+        telegram: telegramUrl.trim()
       }, ...prev]);
 
       setTimeout(() => {
         setIsLaunchModalOpen(false);
         setIsSubmitting(false);
         setStatusMsg("");
+        // Reset form fields
+        setTokenName("");
+        setTokenSymbol("");
+        setTokenDesc("");
+        setLogoFile(null);
+        setPreviewUrl(null);
+        setWebsiteUrl("");
+        setTwitterUrl("");
+        setTelegramUrl("");
       }, 2000);
 
     } catch (err) {
@@ -299,6 +356,9 @@ export default function Home() {
                     
                     <div className="compact-badge-row">
                       <span className="category-tag-compact">Memecoin</span>
+                      {token.website && <a href={token.website} target="_blank" rel="noopener noreferrer" className="compact-social-link" onClick={e=>e.stopPropagation()} title="Website">🌐</a>}
+                      {token.twitter && <a href={token.twitter} target="_blank" rel="noopener noreferrer" className="compact-social-link" onClick={e=>e.stopPropagation()} title="Twitter">🐦</a>}
+                      {token.telegram && <a href={token.telegram} target="_blank" rel="noopener noreferrer" className="compact-social-link" onClick={e=>e.stopPropagation()} title="Telegram">✈️</a>}
                     </div>
 
                     <div className="compact-stats-row">
@@ -400,6 +460,22 @@ export default function Home() {
                   <label>DESCRIPTION</label>
                   <textarea value={tokenDesc} onChange={e=>setTokenDesc(e.target.value)} placeholder="Describe your token..." maxLength="256"></textarea>
                 </div>
+
+                <div className="form-row split-3" style={{ marginTop: '12px' }}>
+                  <div className="form-group">
+                    <label>WEBSITE (OPTIONAL)</label>
+                    <input type="url" value={websiteUrl} onChange={e=>setWebsiteUrl(e.target.value)} placeholder="https://..." />
+                  </div>
+                  <div className="form-group">
+                    <label>TWITTER / X (OPTIONAL)</label>
+                    <input type="url" value={twitterUrl} onChange={e=>setTwitterUrl(e.target.value)} placeholder="https://x.com/..." />
+                  </div>
+                  <div className="form-group">
+                    <label>TELEGRAM (OPTIONAL)</label>
+                    <input type="url" value={telegramUrl} onChange={e=>setTelegramUrl(e.target.value)} placeholder="https://t.me/..." />
+                  </div>
+                </div>
+
 
                 <div className="launch-footer-panel">
                   <div className="fee-display">Launch fee: <span className="mono">0.0005 ETH</span></div>
