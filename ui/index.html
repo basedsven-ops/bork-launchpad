@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BORK | Stock-Backed Memecoin Launchpad</title>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+  <!-- Sticky Header Bar (Full Width Top) -->
+  <header class="header-bar">
+    <div class="logo">
+      <span class="logo-glyph">●</span>
+      <span class="logo-text">BORK</span>
+      <span class="network-badge">Robinhood L2 Mainnet</span>
+    </div>
+    <nav class="nav-pills">
+      <a href="#" class="nav-pill active">Launchpad</a>
+      <a href="docs.html" class="nav-pill">Documentation</a>
+    </nav>
+    <div class="header-actions">
+      <button class="nav-pill action-pill" id="connectWalletBtn">CONNECT WALLET</button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="container">
+    
+    <!-- Hero Split Panel (Clean & Informative) -->
+    <section class="hero-split">
+      <div class="hero-left">
+        <button class="create-token-banner-btn" id="openLaunchModalBtn">
+          ≫ Launch a Token ≪
+        </button>
+        <p class="hero-tagline">Launch stock-backed memecoins on Robinhood Chain L2. 100% fair launch, zero pre-mines, locked LP.</p>
+        
+        <!-- Search Bar -->
+        <div class="search-box-container">
+          <div class="search-input-wrapper">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="tokenSearchInput" placeholder="Search token name or ticker...">
+          </div>
+          <button class="search-submit-btn" id="searchSubmitBtn">Search</button>
+        </div>
+      </div>
+      
+      <!-- Static Platform Metrics Showcase (Replaced dummy slider) -->
+      <div class="hero-right stat-banner-panel">
+        <div class="stat-banner-header">
+          <span class="panel-badge">PROTOCOL RULES</span>
+          <h3>Fair Launch Mechanics</h3>
+        </div>
+        <div class="stat-banner-body">
+          <div class="bullet-point">
+            <strong>$69,000 USD</strong> fixed graduation market cap.
+          </div>
+          <div class="bullet-point">
+            Collects <strong>$13,800 USD</strong> worth of RWA token collateral (20%) on bonding curve.
+          </div>
+          <div class="bullet-point">
+            Automatic graduation to Uniswap V3 with 100% LP burned.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Advanced Filter & Toggle Bar -->
+    <section class="filter-controls-section">
+      <!-- Tabs Group -->
+      <div class="tabs-row">
+        <div class="filter-tabs">
+          <button class="tab-btn active" data-filter="ALL">All Tokens</button>
+          <button class="tab-btn" data-filter="RWA">RWA Pairs (Stocks/ETFs)</button>
+          <button class="tab-btn" data-filter="Crypto">Crypto Pairs</button>
+        </div>
+
+        <!-- Quick Sort & Controls -->
+        <div class="sort-controls">
+          <div class="toggle-control">
+            <label class="switch">
+              <input type="checkbox" id="graduatedToggle">
+              <span class="slider-toggle"></span>
+            </label>
+            <span class="toggle-label">Graduated Only</span>
+          </div>
+
+          <select id="sortSelect" class="control-dropdown">
+            <option value="featured">Featured</option>
+            <option value="newest">Newest</option>
+            <option value="mcap">Market Cap</option>
+            <option value="progress">Progress</option>
+          </select>
+
+          <button class="refresh-btn" id="refreshBtn" title="Refresh Feed">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M23 4v6h-6M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Hot Fire Tags Row -->
+      <div class="hot-tags-row">
+        <span class="hot-label">🔥 HOT COLLATERALS:</span>
+        <div class="tags-scroll">
+          <button class="tag-pill active" data-tag="ALL">All Stocks</button>
+          <button class="tag-pill" data-tag="RDDT">Reddit ($RDDT)</button>
+          <button class="tag-pill" data-tag="NVDA">NVIDIA ($NVDA)</button>
+          <button class="tag-pill" data-tag="TSLA">Tesla ($TSLA)</button>
+          <button class="tag-pill" data-tag="GME">GameStop ($GME)</button>
+          <button class="tag-pill" data-tag="WETH">Ethereum ($WETH)</button>
+          <button class="tag-pill" data-tag="SPY">S&P 500 ($SPY)</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Active Bonding Curves Grid -->
+    <section class="tokens-section">
+      <div class="tokens-grid-modern" id="tokensGrid">
+        <!-- Tokens rendered dynamically via index.js -->
+      </div>
+    </section>
+  </main>
+
+  <!-- ─── LAUNCH TOKEN MODAL (DETAILED PROPER FORM LIKE NOXA) ─── -->
+  <div class="modal-overlay" id="launchModal">
+    <div class="modal-large">
+      <div class="modal-header">
+        <h2>Launch a token</h2>
+        <button class="close-btn" id="closeLaunchModalBtn">&times;</button>
+      </div>
+      
+      <form id="launchForm" class="launch-form-grid">
+        
+        <!-- Left Column: Inputs -->
+        <div class="form-scroll-area">
+          <div class="form-row split-2">
+            <div class="form-group">
+              <label>SELECT DEX *</label>
+              <div class="selector-pills">
+                <button type="button" class="selector-pill active">Uniswap V3</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>SELECT PAIR TOKEN *</label>
+              <select id="collateralToken" required>
+                <!-- Filled dynamically with 70+ whitelist RWA tokens -->
+              </select>
+            </div>
+          </div>
+
+          <!-- Configuration Details Panel -->
+          <div class="config-panel">
+            <span class="panel-title">CONFIGURATION DETAILS</span>
+            <div class="config-row">
+              <span>DEX:</span>
+              <span class="mono">Uniswap V3</span>
+            </div>
+            <div class="config-row">
+              <span>Total Supply:</span>
+              <span class="mono">1,000,000,000 MEME</span>
+            </div>
+            <div class="config-row">
+              <span>Graduation Market Cap:</span>
+              <span class="mono" style="font-weight: 700;">$69,000 USD (Fixed)</span>
+            </div>
+            <div class="config-row">
+              <span>Target Collateral Needed:</span>
+              <span class="mono" id="configTargetCollateral" style="font-weight: 700;">220.98 RDDT</span>
+            </div>
+            <div class="config-row">
+              <span>Anti-Snipe Protection:</span>
+              <span class="mono">Enabled (366 Blocks)</span>
+            </div>
+          </div>
+
+          <!-- Image Upload Area -->
+          <div class="form-group">
+            <label>LOGO IMAGE *</label>
+            <div class="image-upload-box" id="uploadBox">
+              <img id="imagePreview" class="image-preview" src="" alt="preview">
+              <div class="upload-icon" id="uploadIcon">↑</div>
+              <div class="upload-text">Upload token logo</div>
+              <span class="upload-note">PNG, JPEG, WebP, or GIF (max 4.5MB)</span>
+              <input type="file" id="logoInput" accept="image/*" style="display: none;">
+            </div>
+          </div>
+
+          <!-- Name and Symbol -->
+          <div class="form-row split-2">
+            <div class="form-group">
+              <label for="tokenName">TOKEN NAME *</label>
+              <input type="text" id="tokenName" placeholder="e.g. Plasma Wizard" required>
+            </div>
+            <div class="form-group">
+              <label for="tokenSymbol">SYMBOL *</label>
+              <input type="text" id="tokenSymbol" placeholder="e.g. PLAS" required>
+            </div>
+          </div>
+
+          <!-- Description -->
+          <div class="form-group">
+            <label for="tokenDesc">DESCRIPTION</label>
+            <textarea id="tokenDesc" placeholder="Describe your token..." maxlength="256"></textarea>
+          </div>
+
+          <!-- Social Links -->
+          <div class="form-group">
+            <label>SOCIAL LINKS (OPTIONAL)</label>
+            <div class="social-inputs-grid">
+              <input type="text" id="linkTwitter" placeholder="Twitter / X (@username or URL)">
+              <input type="text" id="linkTelegram" placeholder="Telegram (@username or URL)">
+              <input type="text" id="linkDiscord" placeholder="Discord Invite URL">
+              <input type="text" id="linkWebsite" placeholder="Website URL">
+            </div>
+          </div>
+
+          <!-- Advanced Settings Dropdown -->
+          <details class="advanced-details" open>
+            <summary class="advanced-summary">SETTINGS & LAUNCH DETAILS ▾</summary>
+            <div class="advanced-content">
+              <div class="form-group">
+                <label for="targetCollateralDisplay">TARGET FUNDING AMOUNT (CALCULATED TO MATCH $69,000 USD MCAP)</label>
+                <input type="text" id="targetCollateralDisplay" value="220.98 RDDT" readonly style="background-color: var(--color-linen); color: var(--color-graphite); font-weight: 500; cursor: not-allowed;">
+                <span class="form-help">This value is dynamically set based on the RWA price to guarantee a $69,000 USD valuation at pool graduation.</span>
+              </div>
+              <div class="form-group">
+                <label for="initialBuy">INITIAL BUY AMOUNT (OPTIONAL)</label>
+                <input type="number" id="initialBuy" placeholder="0.0" min="0" step="any">
+                <span class="form-help">Buy your own token immediately after launch.</span>
+              </div>
+            </div>
+          </details>
+
+          <!-- Launch Fee and Submit -->
+          <div class="launch-footer-panel">
+            <div class="fee-display">Launch fee: <span class="mono">0.0005 ETH</span></div>
+            <button type="submit" class="primary-cta launch-submit-btn">Launch Token</button>
+          </div>
+
+        </div>
+
+        <!-- Right Column: Info Panel -->
+        <div class="form-info-sidebar">
+          <div class="info-block">
+            <h3>Required Fields</h3>
+            <ul>
+              <li>Launch configuration (DEX, Pair token)</li>
+              <li>Token name & symbol</li>
+              <li>Logo image (square, min 250×250)</li>
+            </ul>
+          </div>
+          
+          <div class="info-block">
+            <h3>Fixed Pricing</h3>
+            <ul>
+              <li>Graduation Cap: $69,000 USD</li>
+              <li>Target amount matches asset market value</li>
+            </ul>
+          </div>
+
+          <div class="info-block bg-linen">
+            <h3>How it works</h3>
+            <ol>
+              <li>Select pair stock token</li>
+              <li>Upload logo & enter token details</li>
+              <li>Launch token with one transaction</li>
+              <li>Buy tokens immediately after launch</li>
+            </ol>
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- ─── SWAP / TRADE MODAL ─── -->
+  <div class="modal-overlay" id="swapModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Trade Asset</h2>
+        <button class="close-btn" id="closeSwapModalBtn">&times;</button>
+      </div>
+      <div class="swap-container">
+        <div class="swap-tabs">
+          <button class="swap-tab active" id="buyTab">Buy</button>
+          <button class="swap-tab" id="sellTab">Sell</button>
+        </div>
+        
+        <div class="swap-input-box">
+          <label id="inputLabel">PAY</label>
+          <div class="swap-input-row">
+            <input type="number" id="payAmount" value="1" min="0" step="any">
+            <span class="token-select-display" id="payTokenSymbol">RDDT</span>
+          </div>
+        </div>
+
+        <div class="swap-arrow">↓</div>
+
+        <div class="swap-input-box">
+          <label id="outputLabel">RECEIVE (ESTIMATE)</label>
+          <div class="swap-input-row">
+            <input type="number" id="receiveAmount" value="100000" disabled>
+            <span class="token-select-display" id="receiveTokenSymbol">NAPE</span>
+          </div>
+        </div>
+
+        <button class="primary-cta swap-submit-btn" id="executeSwapBtn">EXECUTE TRANSACTION →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Links -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+  <script src="abi.js"></script>
+  <script src="index.js"></script>
+</body>
+</html>

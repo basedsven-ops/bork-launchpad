@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BORK | Documentation</title>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="docs.css">
+</head>
+<body>
+
+  <!-- Sticky Header Bar -->
+  <header class="header-bar">
+    <div class="logo">
+      <span class="logo-glyph">●</span>
+      <span class="logo-text">BORK</span>
+    </div>
+    <nav class="nav-pills">
+      <a href="index.html" class="nav-pill">← Back to Launchpad</a>
+    </nav>
+  </header>
+
+  <!-- GitBook-Style Layout -->
+  <div class="docs-layout">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <h3>GETTING STARTED</h3>
+        <a href="#intro" class="sidebar-link active">Introduction</a>
+        <a href="#how-it-works" class="sidebar-link">How it Works</a>
+      </div>
+      <div class="sidebar-section">
+        <h3>PROTOCOL MECHANICS</h3>
+        <a href="#bonding-curve" class="sidebar-link">Hybrid Bonding Curve</a>
+        <a href="#uniswap-v3" class="sidebar-link">Uniswap V3 Integration</a>
+        <a href="#incentives" class="sidebar-link">Creator Incentives</a>
+      </div>
+      <div class="sidebar-section">
+        <h3>ASSETS & SECURITY</h3>
+        <a href="#rwa-whitelist" class="sidebar-link">Supported RWA Tokens</a>
+        <a href="#security" class="sidebar-link">Auditing & Safety</a>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="content-area">
+      
+      <!-- Introduction Section -->
+      <section id="intro" class="doc-section">
+        <h1>Introduction</h1>
+        <p class="lead-p">BORK is a hybrid tokenized-stock launchpad deployed on Robinhood Chain L2 (Arbitrum Orbit Stack).</p>
+        <p>By pairing the virality of memecoins with the economic stability of Real-World Assets (RWA), BORK allows creators to deploy permissionless tokens backed natively by fractionalized equities and ETFs such as Reddit ($RDDT), NVIDIA ($NVDA), and Tesla ($TSLA).</p>
+        
+        <div class="callout Linen">
+          <strong>Key Innovation:</strong> Unlike typical launchpads that rely purely on volatile native currencies (like ETH) or virtual liquidity, BORK assets are anchored to real on-chain equities.
+        </div>
+      </section>
+
+      <!-- How it Works Section -->
+      <section id="how-it-works" class="doc-section">
+        <h2>How it Works</h2>
+        <p>Deploying and trading stock-backed memecoins on BORK is completed in three trustless phases:</p>
+        
+        <div class="numbered-steps">
+          <div class="step-item">
+            <div class="step-number">1</div>
+            <div class="step-info">
+              <h4>Launch with Stock Backing</h4>
+              <p>Creators specify their token's name, symbol, target collateral, and the backing RWA equity token. The factory mints 1,000,000,000 memecoins and holds them securely.</p>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">2</div>
+            <div class="step-info">
+              <h4>Bonding Curve Phase</h4>
+              <p>Traders buy meme tokens directly using the specified RWA stock token. 80% of the total meme supply is distributed dynamically based on a linear funding rate.</p>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">3</div>
+            <div class="step-info">
+              <h4>Direct V3 Pool Locking</h4>
+              <p>Once the RWA collateral reaches 100% of the target (e.g. 10 RDDT), the factory deposits the remaining 20% of the memecoins and 100% of collected RWA tokens directly into a Uniswap V3 Pool (1% fee tier) and initializes the price ratio, locking the liquidity forever.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Hybrid Bonding Curve Section -->
+      <section id="bonding-curve" class="doc-section">
+        <h2>Hybrid Bonding Curve & Graduation valuation</h2>
+        <p>Unlike standard bonding curves where creators can set arbitrary funding targets, BORK implements a <strong>fixed $69,000 USD Market Cap graduation target</strong> (matching standard pump.fun specifications). This guarantees a standard initial valuation for all memecoins graduating to Uniswap V3.</p>
+        <p>The bonding curve completed state requires raising exactly <strong>20% of the graduation market cap ($13,800 USD)</strong> in RWA collateral tokens. This is calculated dynamically based on the RWA price:</p>
+
+        <div class="math-block">
+          \[\text{Target Collateral Needed} = \frac{\$13,800 \text{ USD}}{\text{Market Price of RWA Token}}\]
+        </div>
+
+        <p><strong>Example Target Computations:</strong></p>
+        <ul>
+          <li><strong>Reddit ($RDDT) at $62.45:</strong> requires <code>220.98 RDDT</code> target collateral.</li>
+          <li><strong>NVIDIA ($NVDA) at $125.00:</strong> requires <code>110.40 NVDA</code> target collateral.</li>
+          <li><strong>Tesla ($TSLA) at $220.50:</strong> requires <code>62.59 TSLA</code> target collateral.</li>
+          <li><strong>Wrapped Ethereum ($WETH) at $3,450.00:</strong> requires <code>4.00 WETH</code> target collateral.</li>
+        </ul>
+      </section>
+
+      <!-- Uniswap V3 Integration Section -->
+      <section id="uniswap-v3" class="doc-section">
+        <h2>Uniswap V3 Integration</h2>
+        <p>BORK implements a <strong>zero-migration, single-sided liquidity listing</strong> model on Uniswap V3:</p>
+        <ul>
+          <li><strong>Tick Spacing:</strong> Standardized at 200 ticks (for the 1% fee tier).</li>
+          <li><strong>Range:</strong> Full range liquidity placement from tick <code>-887200</code> to <code>887200</code>.</li>
+          <li><strong>Safe price initialization:</strong> The factory computes the exact square-root price ratio mathematically:</li>
+        </ul>
+
+        <div class="math-block">
+          \[\text{sqrtPriceX96} = \sqrt{\frac{\text{Collateral LP Amount}}{\text{Meme LP Amount}}} \times 2^{96}\]
+        </div>
+
+        <p>Using the custom <code>uniswapV3MintCallback</code> interface, the pool pulls tokens securely during initialization. The ownership of the Uniswap V3 position NFT is permanently burned (sent to <code>address(0)</code> or the creator to be locked) ensuring the pool can never be rugged.</p>
+      </section>
+
+      <!-- Creator Incentives Section -->
+      <section id="incentives" class="doc-section">
+        <h2>Creator Incentives</h2>
+        <p>To incentivize builders to launch proper, high-quality projects, BORK leverages Uniswap V3's native fee-collection mechanism:</p>
+        <ol>
+          <li>Since the V3 liquidity position belongs to the creator (or is locked in a vault), all trading fees generated in the 1% fee tier pool are dynamically tracked.</li>
+          <li>Token creators can claim these generated RWA fees directly on-chain, creating a sustainable revenue stream based on trading volume.</li>
+        </ol>
+      </section>
+
+      <!-- Supported RWA Tokens Section -->
+      <section id="rwa-whitelist" class="doc-section">
+        <h2>Supported RWA Tokens</h2>
+        <p>The Robinhood Chain L2 mainnet features over 70+ tokenized equities. BORK supports any of these assets, including:</p>
+        
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Underlying Asset</th>
+                <th>Contract Address</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>RDDT</code></td>
+                <td>Reddit Inc. Stock</td>
+                <td><a href="#" class="mono-link">0x05b37Fb...C36F4C</a></td>
+              </tr>
+              <tr>
+                <td><code>NVDA</code></td>
+                <td>NVIDIA Corp. Stock</td>
+                <td><a href="#" class="mono-link">0xd0601CE...D9EEC</a></td>
+              </tr>
+              <tr>
+                <td><code>TSLA</code></td>
+                <td>Tesla Inc. Stock</td>
+                <td><a href="#" class="mono-link">0x322F092...3b2d</a></td>
+              </tr>
+              <tr>
+                <td><code>SPY</code></td>
+                <td>SPDR S&P 500 ETF</td>
+                <td><a href="#" class="mono-link">0x117cc21...4C0C</a></td>
+              </tr>
+              <tr>
+                <td><code>GME</code></td>
+                <td>GameStop Corp. Stock</td>
+                <td><a href="#" class="mono-link">0x1b0E319...153E</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Security Section -->
+      <section id="security" class="doc-section">
+        <h2>Auditing & Safety</h2>
+        <div class="callout Linen">
+          <strong>Security Auditing:</strong> The BORK factory smart contracts are fully checked with the Foundry test suite under popping poptye RPC forks.
+        </div>
+        <p>Key safety measures implemented:</p>
+        <ul>
+          <li><strong>No migration risks:</strong> Unlike traditional curve systems, there are no temporary contracts storing massive assets. Liquidity goes directly to standard Uniswap V3.</li>
+          <li><strong>Standard ERC-20 integration:</strong> All whitelist RWA tokens are treated as standard ERC-20s, requiring active allowances for all transfers.</li>
+        </ul>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- LaTeX Math Rendering support -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</body>
+</html>

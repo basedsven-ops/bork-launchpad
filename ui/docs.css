@@ -1,0 +1,288 @@
+/* ─── BORK DOCS STYLE REFERENCE ─── */
+:root {
+  --color-obsidian: #111111;
+  --color-paper: #ffffff;
+  --color-linen: #e9eaeb;
+  --color-sand: #d8d3cc;
+  --color-graphite: #615e5b;
+  --color-ash: #888888;
+  --color-onyx: #000000;
+
+  --font-geist: 'Inter', -apple-system, system-ui, sans-serif;
+  --font-geist-mono: 'JetBrains Mono', monospace;
+
+  --spacing-16: 16px;
+  --spacing-24: 24px;
+  --spacing-32: 32px;
+  --spacing-40: 40px;
+  --spacing-80: 80px;
+
+  --radius-cards: 32px;
+  --radius-buttons: 160px;
+  --radius-nav-pills: 140px;
+  --radius-small-elements: 10px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-obsidian);
+  font-family: var(--font-geist);
+  font-weight: 400;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Header Bar */
+.header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-16) var(--spacing-24);
+  background-color: var(--color-paper);
+  border-bottom: 1px solid var(--color-obsidian);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.logo-glyph {
+  font-size: 14px;
+}
+
+.nav-pills {
+  display: flex;
+}
+
+.nav-pill {
+  background-color: var(--color-linen);
+  border: 1px solid var(--color-obsidian);
+  color: var(--color-obsidian);
+  padding: 6px 16px;
+  border-radius: var(--radius-nav-pills);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+}
+
+.nav-pill:hover {
+  background-color: var(--color-sand);
+}
+
+/* GitBook-Style Layout */
+.docs-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: calc(100vh - 73px);
+}
+
+/* Sidebar */
+.sidebar {
+  border-right: 1px solid var(--color-linen);
+  padding: var(--spacing-40) var(--spacing-24) var(--spacing-40) 0;
+  position: sticky;
+  top: 73px;
+  height: calc(100vh - 73px);
+  overflow-y: auto;
+}
+
+.sidebar-section {
+  margin-bottom: var(--spacing-32);
+}
+
+.sidebar-section h3 {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-ash);
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+
+.sidebar-link {
+  display: block;
+  color: var(--color-graphite);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 6px 0;
+  transition: color 0.2s ease;
+}
+
+.sidebar-link:hover, .sidebar-link.active {
+  color: var(--color-obsidian);
+}
+
+.sidebar-link.active {
+  font-weight: 700;
+}
+
+/* Content Area */
+.content-area {
+  padding: var(--spacing-40) var(--spacing-40) var(--spacing-80) var(--spacing-40);
+  max-width: 800px;
+}
+
+.doc-section {
+  padding-bottom: var(--spacing-40);
+  margin-bottom: var(--spacing-40);
+  border-bottom: 1px solid var(--color-linen);
+}
+
+.doc-section:last-child {
+  border-bottom: none;
+}
+
+h1 {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin-bottom: var(--spacing-24);
+}
+
+h2 {
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--spacing-16);
+  margin-top: var(--spacing-24);
+}
+
+h4 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+p {
+  font-size: 16px;
+  color: var(--color-graphite);
+  margin-bottom: var(--spacing-20);
+}
+
+.lead-p {
+  font-size: 18px;
+  color: var(--color-obsidian);
+}
+
+/* Callout Box */
+.callout {
+  background-color: var(--color-linen);
+  border-left: 4px solid var(--color-obsidian);
+  border-radius: 4px;
+  padding: var(--spacing-16);
+  margin: var(--spacing-24) 0;
+  font-size: 15px;
+}
+
+/* Steps */
+.numbered-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-24);
+  margin: var(--spacing-32) 0;
+}
+
+.step-item {
+  display: flex;
+  gap: var(--spacing-16);
+}
+
+.step-number {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-obsidian);
+  border-radius: var(--radius-buttons);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.step-info p {
+  font-size: 14px;
+  margin-bottom: 0;
+}
+
+/* Math Block */
+.math-block {
+  background-color: var(--color-linen);
+  padding: var(--spacing-24);
+  border-radius: var(--radius-small-elements);
+  margin: var(--spacing-24) 0;
+  overflow-x: auto;
+  font-family: var(--font-geist-mono);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* Table styling matching BORK */
+.table-container {
+  border: 1px solid var(--color-obsidian);
+  border-radius: var(--radius-small-elements);
+  overflow: hidden;
+  margin: var(--spacing-24) 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+th, td {
+  padding: 12px 16px;
+  font-size: 14px;
+}
+
+th {
+  background-color: var(--color-linen);
+  border-bottom: 1px solid var(--color-obsidian);
+  font-weight: 700;
+}
+
+td {
+  border-bottom: 1px solid var(--color-linen);
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+code {
+  font-family: var(--font-geist-mono);
+  background-color: var(--color-linen);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.mono-link {
+  font-family: var(--font-geist-mono);
+  color: var(--color-obsidian);
+  text-decoration: underline;
+}
+
+.mono-link:hover {
+  color: var(--color-graphite);
+}
