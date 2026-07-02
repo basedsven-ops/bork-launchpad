@@ -62,10 +62,11 @@ export default function TokenDetail() {
         const provider = new ethers.JsonRpcProvider("https://rpc.mainnet.chain.robinhood.com");
         const factory = new ethers.Contract(FACTORY_ADDRESS, RWATokenFactoryABI, provider);
 
-        const [boughtEvents, soldEvents] = await Promise.all([
-          factory.queryFilter(factory.filters.TokenBought(address), 0, "latest"),
-          factory.queryFilter(factory.filters.TokenSold(address), 0, "latest")
-        ]);
+        // Fetch sequentially to prevent rate limiting, use factory deploy block
+        const startBlock = 1318000;
+        const boughtEvents = await factory.queryFilter(factory.filters.TokenBought(address), startBlock, "latest");
+        const soldEvents = await factory.queryFilter(factory.filters.TokenSold(address), startBlock, "latest");
+
         const allEvents = [...boughtEvents, ...soldEvents].sort(
           (a, b) => a.blockNumber - b.blockNumber || a.transactionIndex - b.transactionIndex
         );
