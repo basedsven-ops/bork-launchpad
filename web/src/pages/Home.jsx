@@ -29,7 +29,7 @@ export default function Home() {
   useEffect(() => {
     async function fetchTokens() {
       try {
-        const provider = new ethers.JsonRpcProvider("https://rpc.testnet.chain.robinhood.com");
+        const provider = new ethers.JsonRpcProvider("https://rpc.mainnet.chain.robinhood.com");
         const factory = new ethers.Contract(FACTORY_ADDRESS, RWATokenFactoryABI, provider);
         const allTokenAddrs = await factory.getAllTokens();
         

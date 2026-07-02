@@ -5,13 +5,15 @@ export const client = createThirdwebClient({
 });
 
 export const robinhoodChain = defineChain({
-  id: 46630,
-  rpc: "https://rpc.testnet.chain.robinhood.com",
+  id: 4663,
+  rpc: "https://rpc.mainnet.chain.robinhood.com",
 });
 
 export const TARGET_RAISE_USD = 13800; // 20% of 69k
-export const FACTORY_ADDRESS = "0xebE5837533B3A9E60a755294F8D208B9Cf25d908";
-export const RWATokenFactoryABI = [
+export const FACTORY_ADDRESS = "0x2bc30C426775Ec47a3Db371A72b29378e9551174";
+export const ZAPPER_ADDRESS = "0x7c03129e42091E985BC03f6f3F0E80207e6486aD";
+
+export const FACTORY_ABI = [
   "function launchToken(string name, string symbol, address collateralToken, uint256 targetCollateral, string tokenURI) external returns (address)",
   "function getAllTokens() external view returns (address[])",
   "function tokens(address) external view returns (address creator, address collateralToken, uint256 targetCollateral, uint256 currentCollateral, uint256 memeSold, bool completed, uint256 totalMemeSupply, string tokenURI, uint256 virtualMemeReserve, uint256 virtualCollateralReserve)",
@@ -22,6 +24,13 @@ export const RWATokenFactoryABI = [
   "event TokenLaunched(address indexed tokenAddress, address indexed creator, address collateralToken, uint256 targetCollateral, string tokenURI)",
   "event TokenBought(address indexed tokenAddress, address indexed buyer, uint256 collateralAmount, uint256 memeAmount)",
   "event TokenSold(address indexed tokenAddress, address indexed seller, uint256 memeAmount, uint256 collateralAmount)"
+];
+
+// Alias for backwards compatibility if needed
+export const RWATokenFactoryABI = FACTORY_ABI;
+
+export const ZAPPER_ABI = [
+  "function zapBuy(address memeToken, address collateralToken, uint24 poolFee, int24 tickSpacing) external payable"
 ];
 
 export const ERC20ABI = [

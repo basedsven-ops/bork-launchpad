@@ -10,22 +10,43 @@ interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
 }
 
-interface IUniswapV3Factory {
-    function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address pool);
-    function createPool(address tokenA, address tokenB, uint24 fee) external returns (address pool);
+struct PoolKey {
+    address currency0;
+    address currency1;
+    uint24 fee;
+    int24 tickSpacing;
+    address hooks;
 }
 
-interface IUniswapV3Pool {
-    function initialize(uint160 sqrtPriceX96) external;
-    function token0() external view returns (address);
-    function token1() external view returns (address);
-    function mint(
-        address recipient,
-        int24 tickLower,
-        int24 tickUpper,
-        uint128 amount,
-        bytes calldata data
-    ) external returns (uint256 amount0, uint256 amount1);
+struct BalanceDelta {
+    int256 amount0;
+    int256 amount1;
+}
+
+struct SwapParams {
+    bool zeroForOne;
+    int256 amountSpecified;
+    uint160 sqrtPriceLimitX96;
+}
+
+interface IPoolManager {
+    function initialize(PoolKey memory key, uint160 sqrtPriceX96) external returns (int24 tick);
+    function unlock(bytes calldata data) external returns (bytes memory);
+    function swap(
+        PoolKey calldata key,
+        SwapParams calldata params,
+        bytes calldata hookData
+    ) external returns (BalanceDelta memory delta);
+    function settle(address currency) external returns (uint256);
+    function take(address currency, address to, uint256 amount) external;
+}
+
+interface IPositionManager {
+    function modifyLiquidities(bytes calldata unlockData, uint256 deadline) external payable;
+}
+
+interface IPermit2 {
+    function approve(address token, address spender, uint160 amount, uint48 expiration) external;
 }
 
 contract RWATokenFactory {
@@ -43,9 +64,10 @@ contract RWATokenFactory {
         uint256 virtualCollateralReserve;
     }
 
-    address public constant UNISWAP_V3_FACTORY  = 0x1f7d7550B1b028f7571E69A784071F0205FD2EfA;
-    address public constant POSITION_MANAGER    = 0xCaf681a66D020601342297493863E78C959E5cb2;
-    uint24  public constant POOL_FEE            = 10000;
+    address public constant POOL_MANAGER        = 0x8366a39CC670B4001A1121B8F6A443A643e40951;
+    address public constant POSITION_MANAGER    = 0x58daec3116aae6D93017bAAea7749052E8a04fA7;
+    address public constant PERMIT2             = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
+    uint24  public constant POOL_FEE            = 3000;
 
     mapping(address => TokenInfo) public tokens;
     address[] public allTokens;
@@ -174,42 +196,51 @@ contract RWATokenFactory {
         uint256 amount0 = memeIsToken0 ? memeLpAmount      : collateralLpAmount;
         uint256 amount1 = memeIsToken0 ? collateralLpAmount : memeLpAmount;
 
-        address pool = IUniswapV3Factory(UNISWAP_V3_FACTORY).getPool(token0, token1, POOL_FEE);
-        if (pool == address(0)) {
-            pool = IUniswapV3Factory(UNISWAP_V3_FACTORY).createPool(token0, token1, POOL_FEE);
-        }
+        PoolKey memory key = PoolKey({
+            currency0: token0,
+            currency1: token1,
+            fee: POOL_FEE,
+            tickSpacing: 60,
+            hooks: address(0)
+        });
 
         uint256 ratioX192   = (amount1 << 192) / amount0;
         uint160 sqrtPriceX96 = uint160(_sqrt(ratioX192));
-        IUniswapV3Pool(pool).initialize(sqrtPriceX96);
 
-        IERC20(token0).approve(pool, amount0);
-        IERC20(token1).approve(pool, amount1);
+        // Initialize pool (wrap in try/catch in case it's already initialized)
+        try IPoolManager(POOL_MANAGER).initialize(key, sqrtPriceX96) {} catch {}
 
-        int24 tickLower = -887200;
-        int24 tickUpper =  887200;
+        // Approve tokens to Permit2
+        IERC20(token0).approve(PERMIT2, type(uint256).max);
+        IERC20(token1).approve(PERMIT2, type(uint256).max);
+
+        // Approve tokens from Permit2 to PositionManager
+        IPermit2(PERMIT2).approve(token0, POSITION_MANAGER, type(uint160).max, type(uint48).max);
+        IPermit2(PERMIT2).approve(token1, POSITION_MANAGER, type(uint160).max, type(uint48).max);
 
         uint128 liquidity = uint128(amount0 < amount1 ? amount0 : amount1);
         if (liquidity == 0) liquidity = 1;
 
-        (uint256 amt0, uint256 amt1) = IUniswapV3Pool(pool).mint(
-            info.creator,
-            tickLower,
-            tickUpper,
-            liquidity,
-            abi.encode(token0, token1, address(this))
+        // V4 PositionManager modifyLiquidities command encoding
+        // Actions: MINT_POSITION (0x02), SETTLE_PAIR (0x0d)
+        bytes memory actions = abi.encodePacked(uint8(2), uint8(13));
+        bytes[] memory params = new bytes[](2);
+        
+        params[0] = abi.encode(
+            key,
+            int24(-887220), // tickLower (full range)
+            int24(887220),  // tickUpper
+            uint256(liquidity),
+            amount0,        // amount0Max
+            amount1,        // amount1Max
+            info.creator,   // recipient
+            ""              // hookData
         );
+        params[1] = abi.encode(token0, token1);
 
-        emit LiquidityAdded(tokenAddress, pool, 0, amt0, amt1);
-    }
+        IPositionManager(POSITION_MANAGER).modifyLiquidities(abi.encode(actions, params), block.timestamp);
 
-    function uniswapV3MintCallback(uint256 amount0Owed, uint256 amount1Owed, bytes calldata data) external {
-        (address token0, address token1, ) = abi.decode(data, (address, address, address));
-        address expectedPool = IUniswapV3Factory(UNISWAP_V3_FACTORY).getPool(token0, token1, POOL_FEE);
-        require(msg.sender == expectedPool, "Unauthorized callback");
-
-        if (amount0Owed > 0) IERC20(token0).transfer(msg.sender, amount0Owed);
-        if (amount1Owed > 0) IERC20(token1).transfer(msg.sender, amount1Owed);
+        emit LiquidityAdded(tokenAddress, POSITION_MANAGER, 0, amount0, amount1);
     }
 
     function getAllTokens() external view returns (address[] memory) {
@@ -217,11 +248,7 @@ contract RWATokenFactory {
     }
 
     function getPool(address tokenAddress) external view returns (address) {
-        TokenInfo storage info = tokens[tokenAddress];
-        (address token0, address token1) = tokenAddress < info.collateralToken
-            ? (tokenAddress, info.collateralToken)
-            : (info.collateralToken, tokenAddress);
-        return IUniswapV3Factory(UNISWAP_V3_FACTORY).getPool(token0, token1, POOL_FEE);
+        return POOL_MANAGER;
     }
 
     function getTokenURI(address tokenAddress) external view returns (string memory) {

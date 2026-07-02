@@ -4,7 +4,7 @@ import { useActiveAccount } from 'thirdweb/react';
 import { ethers6Adapter } from 'thirdweb/adapters/ethers6';
 import { ethers } from 'ethers';
 import { createChart } from 'lightweight-charts';
-import { client, robinhoodChain, FACTORY_ADDRESS, RWATokenFactoryABI, ERC20ABI, RWA_WHITELIST, TARGET_RAISE_USD } from '../config';
+import { client, robinhoodChain, FACTORY_ADDRESS, RWATokenFactoryABI, ERC20ABI, RWA_WHITELIST, TARGET_RAISE_USD, ZAPPER_ADDRESS, ZAPPER_ABI } from '../config';
 
 export default function TokenDetail() {
   const { address } = useParams();
@@ -14,8 +14,10 @@ export default function TokenDetail() {
 
   // Trading State
   const [tradeMode, setTradeMode] = useState('buy'); // 'buy' or 'sell'
+  const [payMethod, setPayMethod] = useState('collateral'); // 'collateral' or 'ETH'
   const [payAmount, setPayAmount] = useState('');
   const [collateralBalance, setCollateralBalance] = useState("0.0");
+  const [ethBalance, setEthBalance] = useState("0.0");
   const [memeBalance, setMemeBalance] = useState("0.0");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tradeStatus, setTradeStatus] = useState("");
@@ -42,7 +44,7 @@ export default function TokenDetail() {
 
     const loadChartData = async () => {
       try {
-        const provider = new ethers.JsonRpcProvider("https://rpc.testnet.chain.robinhood.com");
+        const provider = new ethers.JsonRpcProvider("https://rpc.mainnet.chain.robinhood.com");
         const factory = new ethers.Contract(FACTORY_ADDRESS, RWATokenFactoryABI, provider);
         
         const filterBought = factory.filters.TokenBought(address);
@@ -121,7 +123,7 @@ export default function TokenDetail() {
 
   const fetchTokenDetails = async () => {
     try {
-      const provider = new ethers.JsonRpcProvider("https://rpc.testnet.chain.robinhood.com");
+      const provider = new ethers.JsonRpcProvider("https://rpc.mainnet.chain.robinhood.com");
       const factory = new ethers.Contract(FACTORY_ADDRESS, RWATokenFactoryABI, provider);
       const info = await factory.tokens(address);
       
@@ -180,13 +182,16 @@ export default function TokenDetail() {
           
           const rwaBal = await rwaContract.balanceOf(account.address);
           const mBal = await mContract.balanceOf(account.address);
+          const ethBal = await provider.getBalance(account.address);
           
           setCollateralBalance(parseFloat(ethers.formatUnits(rwaBal, 18)).toFixed(4));
+          setEthBalance(parseFloat(ethers.formatUnits(ethBal, 18)).toFixed(4));
           setMemeBalance(parseFloat(ethers.formatUnits(mBal, 18)).toFixed(4));
         } catch (balErr) {
           console.warn("Failed to fetch user balances", balErr);
           // Fallback to 0.0 if the contract fails
           setCollateralBalance("0.0");
+          setEthBalance("0.0");
           setMemeBalance("0.0");
         }
       }
@@ -222,15 +227,29 @@ export default function TokenDetail() {
       const factoryContract = new ethers.Contract(FACTORY_ADDRESS, RWATokenFactoryABI, ethersSigner);
 
       if (tradeMode === 'buy') {
-        // Approve RWA token
-        setTradeStatus("Approving RWA token...");
-        const rwaContract = new ethers.Contract(token.collateralAddress, ["function approve(address, uint256) returns (bool)"], ethersSigner);
-        const txApprove = await rwaContract.approve(FACTORY_ADDRESS, amountWei);
-        await txApprove.wait();
+        if (payMethod === 'ETH') {
+          // Buy using ETH via BorkZapper
+          setTradeStatus("Swapping ETH & Buying Memecoin...");
+          const zapperContract = new ethers.Contract(ZAPPER_ADDRESS, ZAPPER_ABI, ethersSigner);
+          const txZap = await zapperContract.zapBuy(
+            token.id,
+            token.collateralAddress,
+            3000, // 0.3% pool fee
+            60,   // tickSpacing
+            { value: amountWei }
+          );
+          await txZap.wait();
+        } else {
+          // Approve RWA token
+          setTradeStatus("Approving RWA token...");
+          const rwaContract = new ethers.Contract(token.collateralAddress, ["function approve(address, uint256) returns (bool)"], ethersSigner);
+          const txApprove = await rwaContract.approve(FACTORY_ADDRESS, amountWei);
+          await txApprove.wait();
 
-        setTradeStatus("Executing Buy on AMM...");
-        const txBuy = await factoryContract.buyToken(token.id, amountWei);
-        await txBuy.wait();
+          setTradeStatus("Executing Buy on AMM...");
+          const txBuy = await factoryContract.buyToken(token.id, amountWei);
+          await txBuy.wait();
+        }
 
       } else {
         // Approve MEME token
@@ -364,12 +383,31 @@ export default function TokenDetail() {
                   <button className={`trade-tab ${tradeMode === 'buy' ? 'buy-active' : ''}`} onClick={() => setTradeMode('buy')}>Buy</button>
                   <button className={`trade-tab ${tradeMode === 'sell' ? 'sell-active' : ''}`} onClick={() => setTradeMode('sell')}>Sell</button>
                 </div>
+
+                {tradeMode === 'buy' && (
+                  <div className="payment-method-selector" style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                    <button 
+                      className={`pay-method-btn ${payMethod === 'collateral' ? 'active' : ''}`}
+                      onClick={() => { setPayMethod('collateral'); setPayAmount(''); }}
+                      style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #333', background: payMethod === 'collateral' ? 'var(--color-neon-blue)' : '#222', color: payMethod === 'collateral' ? '#000' : '#fff', fontWeight: 'bold', cursor: 'pointer' }}
+                    >
+                      Use {token.collateralSymbol}
+                    </button>
+                    <button 
+                      className={`pay-method-btn ${payMethod === 'ETH' ? 'active' : ''}`}
+                      onClick={() => { setPayMethod('ETH'); setPayAmount(''); }}
+                      style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #333', background: payMethod === 'ETH' ? 'var(--color-neon-blue)' : '#222', color: payMethod === 'ETH' ? '#000' : '#fff', fontWeight: 'bold', cursor: 'pointer' }}
+                    >
+                      Use ETH
+                    </button>
+                  </div>
+                )}
                 
                 <div className="trade-input-wrapper">
                   <div className="trade-input-header">
                     <span>Amount</span>
-                    <span style={{ cursor: 'pointer' }} onClick={() => setPayAmount(tradeMode === 'buy' ? collateralBalance : memeBalance)}>
-                      Balance: {tradeMode === 'buy' ? collateralBalance : memeBalance} {tradeMode === 'buy' ? token.collateralSymbol : token.symbol}
+                    <span style={{ cursor: 'pointer' }} onClick={() => setPayAmount(tradeMode === 'buy' ? (payMethod === 'ETH' ? ethBalance : collateralBalance) : memeBalance)}>
+                      Balance: {tradeMode === 'buy' ? (payMethod === 'ETH' ? ethBalance : collateralBalance) : memeBalance} {tradeMode === 'buy' ? (payMethod === 'ETH' ? 'ETH' : token.collateralSymbol) : token.symbol}
                     </span>
                   </div>
                   <div className="trade-input-row">
@@ -380,7 +418,7 @@ export default function TokenDetail() {
                       onChange={(e) => setPayAmount(e.target.value)}
                     />
                     <div className="trade-currency-badge">
-                      {tradeMode === 'buy' ? token.collateralSymbol : token.symbol}
+                      {tradeMode === 'buy' ? (payMethod === 'ETH' ? 'ETH' : token.collateralSymbol) : token.symbol}
                     </div>
                   </div>
                 </div>
