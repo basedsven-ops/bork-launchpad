@@ -33,52 +33,65 @@ export default function Home() {
         const factory = new ethers.Contract(FACTORY_ADDRESS, RWATokenFactoryABI, provider);
         const allTokenAddrs = await factory.getAllTokens();
         
-        const fetchedTokens = [];
-        for (let i = allTokenAddrs.length - 1; i >= 0; i--) { // latest first
-          const addr = allTokenAddrs[i];
-          const info = await factory.tokens(addr);
-          
-          const memeContract = new ethers.Contract(addr, ERC20ABI, provider);
-          const tName = await memeContract.name();
-          const tSymbol = await memeContract.symbol();
-          
-          let tDesc = "";
-          let tImg = "";
+        const tokenPromises = allTokenAddrs.map(async (addr) => {
           try {
-            const ipfsUrl = info.tokenURI.replace("ipfs://", `https://${client.clientId}.ipfscdn.io/ipfs/`);
-            const metaRes = await fetch(ipfsUrl);
-            const metaJson = await metaRes.json();
-            tDesc = metaJson.description || "";
-            tImg = metaJson.image ? metaJson.image.replace("ipfs://", `https://${client.clientId}.ipfscdn.io/ipfs/`) : "";
-          } catch (e) {
-            console.error("Failed to fetch IPFS metadata", e);
+            const info = await factory.tokens(addr);
+            const memeContract = new ethers.Contract(addr, ERC20ABI, provider);
+            
+            // Parallelize on-chain calls for name/symbol
+            const [tName, tSymbol] = await Promise.all([
+              memeContract.name(),
+              memeContract.symbol()
+            ]);
+            
+            let tDesc = "";
+            let tImg = "";
+            
+            // Metadata fetch can fail without breaking the token listing
+            try {
+              if (info.tokenURI) {
+                const ipfsUrl = info.tokenURI.replace("ipfs://", `https://${client.clientId}.ipfscdn.io/ipfs/`);
+                const metaRes = await fetch(ipfsUrl);
+                const metaJson = await metaRes.json();
+                tDesc = metaJson.description || "";
+                tImg = metaJson.image ? metaJson.image.replace("ipfs://", `https://${client.clientId}.ipfscdn.io/ipfs/`) : "";
+              }
+            } catch (e) {
+              console.error("Failed to fetch IPFS metadata", e);
+            }
+
+            const collateralAsset = RWA_WHITELIST.find(a => a.address.toLowerCase() === info.collateralToken.toLowerCase()) || {};
+
+            // Calculate Dynamic Market Cap
+            const vMeme = parseFloat(ethers.formatUnits(info.virtualMemeReserve, 18));
+            const vCol = parseFloat(ethers.formatUnits(info.virtualCollateralReserve, 18));
+            const ratio = vMeme > 0 ? (vCol / vMeme) : 0;
+            const totalSupply = parseFloat(ethers.formatUnits(info.totalMemeSupply, 18));
+            const mcapUSD = (totalSupply * ratio * (collateralAsset.price || 1)).toLocaleString(undefined, { maximumFractionDigits: 0 });
+
+            return {
+              id: addr,
+              name: tName,
+              symbol: tSymbol,
+              collateralSymbol: collateralAsset.symbol || "UNK",
+              targetCollateral: parseFloat(ethers.formatUnits(info.targetCollateral, 18)),
+              currentCollateral: parseFloat(ethers.formatUnits(info.currentCollateral, 18)),
+              completed: info.completed,
+              priceChange: 0.0, 
+              marketCap: mcapUSD, 
+              category: collateralAsset.category || "Equities",
+              creator: info.creator.substring(0, 6) + "..." + info.creator.substring(38),
+              description: tDesc,
+              image: tImg
+            };
+          } catch (tokenErr) {
+            console.error("Error fetching token", addr, tokenErr);
+            return null;
           }
-
-          const collateralAsset = RWA_WHITELIST.find(a => a.address.toLowerCase() === info.collateralToken.toLowerCase()) || {};
-
-          // Calculate Dynamic Market Cap
-          const vMeme = parseFloat(ethers.formatUnits(info.virtualMemeReserve, 18));
-          const vCol = parseFloat(ethers.formatUnits(info.virtualCollateralReserve, 18));
-          const ratio = vMeme > 0 ? (vCol / vMeme) : 0;
-          const totalSupply = parseFloat(ethers.formatUnits(info.totalMemeSupply, 18));
-          const mcapUSD = (totalSupply * ratio * (collateralAsset.price || 1)).toLocaleString(undefined, { maximumFractionDigits: 0 });
-
-          fetchedTokens.push({
-            id: addr,
-            name: tName,
-            symbol: tSymbol,
-            collateralSymbol: collateralAsset.symbol || "UNK",
-            targetCollateral: parseFloat(ethers.formatUnits(info.targetCollateral, 18)),
-            currentCollateral: parseFloat(ethers.formatUnits(info.currentCollateral, 18)),
-            completed: info.completed,
-            priceChange: 0.0, // We could calculate this against the initial price if we wanted
-            marketCap: mcapUSD, 
-            category: collateralAsset.category || "Equities",
-            creator: info.creator.substring(0, 6) + "..." + info.creator.substring(38),
-            description: tDesc,
-            image: tImg
-          });
-        }
+        });
+        
+        const fetchedTokens = (await Promise.all(tokenPromises)).filter(t => t !== null);
+        fetchedTokens.reverse(); // Keep latest first
         
         setTokens(fetchedTokens);
       } catch (err) {
